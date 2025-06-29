@@ -27,7 +27,7 @@ const transporter = nodemailer.createTransport({
 const JWT_RESET_SECRET = process.env.JWT_SECRET || 'reset_secret';
 
 // Configuration de base
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config();
@@ -36,15 +36,26 @@ const app = express();
 
 
 const corsOptions = {
-  origin: 'http://localhost:5173',
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'https://chatroom-6uv8.onrender.com'
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization'],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   maxAge: 86400,
-  exposedHeaders: ['Authorization'] // Important pour les tokens en réponse
+  exposedHeaders: ['Authorization'] // Important pour les tokens
 };
 
 app.use(cors(corsOptions));
+
 
 
 
@@ -147,7 +158,7 @@ app.post('/forgot-password', async (req, res) => {
 
     // Générer un token JWT valable 15 minutes
     const token = jwt.sign({ userId }, JWT_RESET_SECRET, { expiresIn: '15m' });
-    const resetLink = `http://localhost:5173/reset-password/${token}`;
+    const resetLink = `https://chatroom-6uv8.onrender.com/reset-password/${token}`;
 
     await transporter.sendMail({
       from: process.env.RESET_EMAIL_FROM,
@@ -977,7 +988,7 @@ app.post(
       }
 
       // Construction de l’URL publique de l’image
-      const imageUrl = `http://localhost:${process.env.PORT || 3001}/uploads/${file.filename}`;
+      const imageUrl = `https://chatroom-backend-e1n0.onrender.com/uploads/${file.filename}`;
 
       // Connexion à la base
       const conn = await pool.getConnection();
