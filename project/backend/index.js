@@ -141,6 +141,7 @@ const pool = mysql.createPool({
 });
 
 
+// Votre route existante pour l'envoi de l'e-mail de réinitialisation (POST)
 app.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
 
@@ -158,7 +159,7 @@ app.post('/forgot-password', async (req, res) => {
 
     // Générer un token JWT valable 15 minutes
     const token = jwt.sign({ userId }, JWT_RESET_SECRET, { expiresIn: '15m' });
-    const resetLink = `https://chatroom-6uv8.onrender.com/reset-password/${token}`;
+    const resetLink = `https://chatroom-6uv8.onrender.com/reset-password/${token}`; // Ce lien est correct
 
     await transporter.sendMail({
       from: process.env.RESET_EMAIL_FROM,
@@ -180,8 +181,32 @@ app.post('/forgot-password', async (req, res) => {
   }
 });
 
+// NOUVELLE ROUTE : Pour afficher le formulaire de réinitialisation (GET)
+app.get('/reset-password/:token', (req, res) => {
+  const { token } = req.params;
 
-// Route pour réinitialiser le mot de passe
+  try {
+    // Vérifier si le token est valide et non expiré
+    // Si la vérification échoue, jwt.verify lancera une erreur qui sera capturée
+    jwt.verify(token, JWT_RESET_SECRET);
+
+    // Si le token est valide, affichez la page avec le formulaire de réinitialisation.
+    // Vous devrez avoir un fichier HTML (par exemple, 'resetPassword.html')
+    // qui contient le formulaire et potentiellement un champ caché pour le token.
+    res.sendFile(__dirname + '/public/resetPassword.html'); // Assurez-vous que 'public' est le bon chemin
+    // Ou si vous utilisez un moteur de template comme EJS/Pug:
+    // res.render('resetPassword', { token });
+
+  } catch (error) {
+    console.error('Erreur lors de la vérification du token GET :', error);
+    // Gérer les tokens invalides ou expirés
+    res.status(400).send('Lien de réinitialisation invalide ou expiré.');
+    // Ou rediriger vers une page d'erreur plus conviviale
+    // res.redirect('/expired-link');
+  }
+});
+
+// VOTRE ROUTE EXISTANTE : Pour traiter la soumission du formulaire (POST)
 app.post('/reset-password/:token', async (req, res) => {
   const { token } = req.params;
   const { password } = req.body;
@@ -198,11 +223,21 @@ app.post('/reset-password/:token', async (req, res) => {
 
     res.status(200).json({ message: 'Mot de passe mis à jour avec succès.' });
   } catch (error) {
-    console.error('Erreur reset-password :', error);
+    console.error('Erreur reset-password (POST) :', error);
     res.status(400).json({ error: 'Lien invalide ou expiré.' });
   }
 });
 
+// TRÈS IMPORTANT pour les applications Single Page (SPA) comme React/Vue/Angular:
+// Ajoutez une route "catch-all" après toutes vos routes d'API
+// pour servir le fichier index.html de votre application client.
+// Cela garantit que toutes les routes non API (comme /reset-password/xyz)
+// sont gérées par votre application client côté navigateur.
+// app.get('*', (req, res) => {
+//   res.sendFile(path.resolve(__dirname, 'public', 'index.html'));
+// });
+// Assurez-vous d'importer 'path' si vous utilisez path.resolve
+// const path = require('path');
 
 // AUTHENTIFICATION
 
@@ -1340,6 +1375,8 @@ app.post('/rooms/:roomId/join', authenticate, async (req, res) => {
     });
   }
 });
+
+
 
 
 app.get('/users/:userId/rooms', authenticate, async (req, res) => {
