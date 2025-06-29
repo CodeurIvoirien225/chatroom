@@ -182,29 +182,10 @@ app.post('/forgot-password', async (req, res) => {
 });
 
 // NOUVELLE ROUTE : Pour afficher le formulaire de réinitialisation (GET)
-app.get('/reset-password/:token', (req, res) => {
-  const { token } = req.params;
 
-  try {
-    // Vérifier si le token est valide et non expiré
-    // Si la vérification échoue, jwt.verify lancera une erreur qui sera capturée
-    jwt.verify(token, JWT_RESET_SECRET);
 
-    // Si le token est valide, affichez la page avec le formulaire de réinitialisation.
-    // Vous devrez avoir un fichier HTML (par exemple, 'resetPassword.html')
-    // qui contient le formulaire et potentiellement un champ caché pour le token.
-    res.sendFile(__dirname + '/public/resetPassword.html'); // Assurez-vous que 'public' est le bon chemin
-    // Ou si vous utilisez un moteur de template comme EJS/Pug:
-    // res.render('resetPassword', { token });
 
-  } catch (error) {
-    console.error('Erreur lors de la vérification du token GET :', error);
-    // Gérer les tokens invalides ou expirés
-    res.status(400).send('Lien de réinitialisation invalide ou expiré.');
-    // Ou rediriger vers une page d'erreur plus conviviale
-    // res.redirect('/expired-link');
-  }
-});
+
 
 // VOTRE ROUTE EXISTANTE : Pour traiter la soumission du formulaire (POST)
 app.post('/reset-password/:token', async (req, res) => {
@@ -1396,7 +1377,6 @@ app.get('/users/:userId/rooms', authenticate, async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
-
 
 
 
