@@ -35,7 +35,7 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
   const messagesEndRef = useRef<HTMLDivElement>(null); // Pour le scroll automatique
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-  const API_BASE_URL = 'http://localhost:3001';
+  const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
 
   // Fonction pour récupérer le profil de l'autre utilisateur

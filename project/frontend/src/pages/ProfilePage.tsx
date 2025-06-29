@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar'; // Import du Sidebar
 
 
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
 
 interface ProfileData {

@@ -48,8 +48,11 @@ const ChatPage = () => {
 
   // Référence pour le défilement automatique des messages
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const API_BASE_URL = 'http://localhost:3001';
 
+
+  const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
+
+  
   // Fonction pour vérifier l'appartenance de l'utilisateur à la salle
   const checkMembership = async (): Promise<boolean> => {
     if (!user?.id || !roomId) {

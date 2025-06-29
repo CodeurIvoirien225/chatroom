@@ -34,7 +34,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ roomId }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
 
-  const API_BASE_URL = 'http://localhost:3001';
+  const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
 
   useEffect(() => {

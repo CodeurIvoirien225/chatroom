@@ -25,7 +25,7 @@ const RoomManager: React.FC<RoomManagerProps> = ({ onClose }) => {
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const API_BASE_URL = 'http://localhost:3001';
+  const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
 
   // Form state

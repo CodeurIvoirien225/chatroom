@@ -32,7 +32,7 @@ const UserProfile: React.FC = () => {
 const [showReportModal, setShowReportModal] = useState(false);
 const [reportSuccess, setReportSuccess] = useState(false);
 
-  const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
 
   // Fonction pour récupérer le profil (mise à jour pour inclure currentUser.id)

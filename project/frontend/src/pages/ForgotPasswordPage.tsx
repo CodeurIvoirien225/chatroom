@@ -6,13 +6,15 @@ const ForgotPasswordPage = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('');
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3001/forgot-password', {
+      const response = await fetch('https://chatroom-backend-e1n0.onrender.com/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })

@@ -11,7 +11,8 @@ const QuickRoomCreator: React.FC<QuickRoomCreatorProps> = ({ onRoomCreated }) =>
   const [loading, setLoading] = useState(false);
   const { user: currentUser } = useAuth();
 
-  const API_BASE_URL = 'http://localhost:3001';
+
+  const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
 
   const [formData, setFormData] = useState({

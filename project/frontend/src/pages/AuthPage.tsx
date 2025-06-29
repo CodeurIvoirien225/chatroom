@@ -22,7 +22,7 @@ const AuthPage = () => {
   const navigate = useNavigate();
 
 
-  const API_BASE_URL = 'http://localhost:3001';
+  const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
 
   const handleLogin = async (e: React.FormEvent) => {

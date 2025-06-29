@@ -29,7 +29,7 @@ const RoomList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
 
-  const API_BASE_URL = 'http://localhost:3001';
+  const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
 
   useEffect(() => {
