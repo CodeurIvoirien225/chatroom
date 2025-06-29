@@ -83,7 +83,7 @@ function HomePage() {
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-3">Profil personnalisé</h3>
-            <p className="text-gray-600">Personnalisez votre profil avec une photo, une description et gérez vos paramètres de confidentialité.</p>
+            <p className="text-gray-600">Personnalisez votre profil avec une photo et une description.</p>
           </div>
         </div>
       </section>
