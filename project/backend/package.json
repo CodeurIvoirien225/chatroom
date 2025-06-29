@@ -1,0 +1,26 @@
+{
+  "name": "chat-room-backend",
+  "version": "1.0.0",
+  "description": "Backend for the Chat Room application",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "author": "AYMERIC SAINT-CLAIR AMANI",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.8",
+    "axios": "^1.6.8",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.1",
+    "nodemailer": "^7.0.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
