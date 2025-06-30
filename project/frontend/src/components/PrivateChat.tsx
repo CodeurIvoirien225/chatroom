@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, MessageCircleMore, Check } from 'lucide-react';
-import Sidebar from '../components/Sidebar'; // Importez le composant Sidebar
+import Sidebar from '../components/Sidebar';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
-
-
 
 interface PrivateChatProps {
   currentUserId: number;
@@ -17,11 +15,11 @@ interface Message {
   receiver_id: number;
   content: string;
   created_at: string;
-  is_read: number; // 0 ou 1
+  is_read: number;
 }
 
 interface OtherUserProfile {
-  id: string; // ID de l'autre utilisateur
+  id: string;
   username: string;
   first_name: string | null;
   last_name: string | null;
@@ -32,33 +30,37 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessageContent, setNewMessageContent] = useState('');
   const [otherUserProfile, setOtherUserProfile] = useState<OtherUserProfile | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null); // Pour le scroll automatique
+  const [onlineUsers, setOnlineUsers] = useState<OtherUserProfile[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
-
-  // Fonction pour récupérer le profil de l'autre utilisateur
   const fetchOtherUserProfile = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/profile/${otherUserId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch other user profile');
-      }
+      const response = await fetch(`${API_BASE_URL}/profile/${otherUserId}?current_user_id=${currentUserId}`);
+      if (!response.ok) throw new Error('Failed to fetch other user profile');
       const data = await response.json();
       setOtherUserProfile(data);
     } catch (error) {
       console.error('Error fetching other user profile:', error);
     }
-  }, [otherUserId]);
+  }, [otherUserId, currentUserId]);
 
-  // Fonction pour récupérer les messages entre les deux utilisateurs
+  const fetchOnlineUsers = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/online-users?exclude=${currentUserId}`);
+      const data = await res.json();
+      setOnlineUsers(data);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des utilisateurs en ligne :", error);
+    }
+  }, [currentUserId]);
+
   const fetchMessages = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/private-messages/${currentUserId}/${otherUserId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch messages');
-      }
+      if (!response.ok) throw new Error('Failed to fetch messages');
       const data: Message[] = await response.json();
       setMessages(data);
     } catch (error) {
@@ -66,7 +68,6 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
     }
   }, [currentUserId, otherUserId]);
 
-  // Fonction pour marquer les messages comme lus
   const markMessagesAsRead = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/private-messages/mark-as-read`, {
@@ -85,7 +86,6 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
     }
   }, [currentUserId, otherUserId]);
 
-  // Fonction pour envoyer un nouveau message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newMessageContent.trim() === '') return;
@@ -101,77 +101,64 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
+      if (!response.ok) throw new Error('Failed to send message');
 
       setNewMessageContent('');
-      fetchMessages(); // Recharge les messages après l'envoi
+      fetchMessages();
     } catch (error) {
       console.error('Error sending message:', error);
     }
   };
 
-
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-  
+
     const formData = new FormData();
     formData.append('image', file);
     formData.append('sender_id', String(currentUserId));
     formData.append('receiver_id', String(otherUserId));
-  
+
     try {
       const res = await fetch(`${API_BASE_URL}/private-messages/upload-image`, {
         method: 'POST',
         body: formData
       });
       if (!res.ok) throw new Error('Upload image failed');
-      // On recharge les messages
       fetchMessages();
     } catch (err) {
       console.error(err);
     }
   };
-  
 
-
-
-  // Effet pour charger les messages et marquer comme lu au montage/changement de conversation
   useEffect(() => {
-    fetchOtherUserProfile();
-    fetchMessages();
+    const fetchData = () => {
+      fetchOtherUserProfile();
+      fetchMessages();
+      markMessagesAsRead();
+      fetchOnlineUsers();
+    };
+    fetchData();
+    const intervalId = setInterval(fetchData, 10000);
+    return () => clearInterval(intervalId);
+  }, [fetchMessages, fetchOtherUserProfile, markMessagesAsRead, fetchOnlineUsers]);
 
-    // Marque les messages comme lus dès que la conversation est ouverte
-    markMessagesAsRead();
-
-
-
-
-  }, [fetchMessages, fetchOtherUserProfile, markMessagesAsRead]); // Dépendances
-
-  // Effet pour faire défiler automatiquement vers le bas lorsque de nouveaux messages arrivent
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Fonction pour obtenir l'avatar de fallback
   const getAvatarFallback = (profile: OtherUserProfile | null) => {
     const name = profile?.first_name || profile?.username || 'U';
     return name.charAt(0)?.toUpperCase() || 'U';
   };
+  
 
-
+  const isOtherUserOnline = onlineUsers.some(u => u.id === otherUserId);
 
   return (
-    // Nouveau conteneur Flexbox principal pour la page entière
     <div className="flex h-screen bg-gray-100">
-      <Sidebar /> {/* La Sidebar est placée ici */}
-
-      {/* Le conteneur du chat existant devient l'élément flexible qui prend le reste de l'espace */}
+      <Sidebar />
       <div className="flex-1 flex flex-col bg-gray-50 border-l border-gray-100 overflow-hidden">
-        {/* En-tête du chat - version minimaliste */}
         <div className="p-4 border-b border-gray-100 flex items-center bg-white/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="relative">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center overflow-hidden ring-2 ring-white shadow-sm">
@@ -192,18 +179,19 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
                 </span>
               )}
             </div>
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 rounded-full ring-2 ring-white"></span>
+            <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 ring-white ${isOtherUserOnline ? 'bg-green-400' : 'bg-gray-400'}`}></span>
           </div>
           <div className="ml-3">
             <h3 className="font-medium text-gray-900">
               {otherUserProfile?.first_name || otherUserProfile?.username || '...'}
             </h3>
-            <p className="text-xs text-gray-500 font-light">Actuellement en ligne </p>
+            <p className="text-xs text-gray-500 font-light">
+              {isOtherUserOnline ? 'Actuellement en ligne' : 'Hors ligne'}
+            </p>
           </div>
         </div>
 
-        {/* Zone des messages - style conversation moderne */}
-        <div className="flex-1 p-4 overflow-y-auto space-y-2 bg-[url('https://uploads-ssl.webflow.com/5f5b5a5a5a5a5a5a5a5a5a5a/5f5b5a5a5a5a5a5a5a5a5a5a')] bg-opacity-5 bg-cover">
+        <div className="flex-1 p-4 overflow-y-auto space-y-2 bg-opacity-5 bg-cover">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-gray-100">
@@ -216,35 +204,18 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
             </div>
           ) : (
             messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.sender_id === currentUserId ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[85%] p-3 rounded-2xl ${
-                    message.sender_id === currentUserId
-                      ? 'bg-blue-500 text-white rounded-tr-none'
-                      : 'bg-white text-gray-800 rounded-tl-none shadow-xs border border-gray-100'
-                  } transition-all duration-200`}
-                >
-{/\.(jpe?g|png|gif|webp)$/i.test(message.content) ? (
-  <img
-    src={message.content}
-    alt="Image envoyée"
-    className="max-w-xs rounded-md"
-  />
-) : (
-  <p className="text-sm leading-relaxed">{message.content}</p>
-)}
-                  <div className={`flex items-center justify-end mt-1 space-x-1 ${
-                    message.sender_id === currentUserId ? 'text-blue-100' : 'text-gray-400'
-                  }`}>
+              <div key={message.id} className={`flex ${message.sender_id === currentUserId ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] p-3 rounded-2xl ${message.sender_id === currentUserId ? 'bg-blue-500 text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none shadow-xs border border-gray-100'} transition-all duration-200`}>
+                  {/\.(jpe?g|png|gif|webp)$/i.test(message.content) ? (
+                    <img src={message.content} alt="Image envoyée" className="max-w-xs rounded-md" />
+                  ) : (
+                    <p className="text-sm leading-relaxed">{message.content}</p>
+                  )}
+                  <div className={`flex items-center justify-end mt-1 space-x-1 ${message.sender_id === currentUserId ? 'text-blue-100' : 'text-gray-400'}`}>
                     <span className="text-xs">
                       {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    {message.sender_id === currentUserId && (
-                      <Check className="w-3 h-3" />
-                    )}
+                    {message.sender_id === currentUserId && <Check className="w-3 h-3" />}
                   </div>
                 </div>
               </div>
@@ -253,71 +224,52 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Zone de saisie - style flottant moderne */}
         <div className="sticky bottom-0 bg-white/90 backdrop-blur-sm p-4 border-t border-gray-100">
-  <form
-    onSubmit={handleSendMessage}
-    className="flex items-center bg-white rounded-full px-4 shadow-sm border border-gray-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all duration-200"
-  >
-    {/* Bouton emoji */}
-    <button
-      type="button"
-      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-      className="p-2"
-    >
-      😀
-    </button>
-
-    {/* Input file caché + label pour image */}
-    <input
-      type="file"
-      id="private-image-upload"
-      accept="image/*"
-      onChange={handleImageUpload}
-      className="hidden"
-    />
-    <label htmlFor="private-image-upload" className="cursor-pointer p-2">
-      📷
-    </label>
-
-    {/* Champ texte */}
-    <input
-      type="text"
-      value={newMessageContent}
-      onChange={e => setNewMessageContent(e.target.value)}
-      placeholder="Écrivez un message..."
-      className="flex-1 py-3 bg-transparent focus:outline-none text-gray-700 placeholder-gray-400 text-sm"
-    />
-
-    {/* Bouton envoyer */}
-    <button
-      type="submit"
-      disabled={!newMessageContent.trim()}
-      className={`ml-2 p-2 rounded-full transition-all ${
-        newMessageContent.trim()
-          ? 'text-blue-500 hover:text-blue-600 hover:bg-blue-50'
-          : 'text-gray-300 cursor-not-allowed'
-      }`}
-    >
-      <Send className="w-5 h-5" />
-    </button>
-
-    {/* Emoji picker */}
-    {showEmojiPicker && (
-      <div className="absolute bottom-16 left-4 z-50">
-        <Picker
-          data={data}
-          onEmojiSelect={emoji => setNewMessageContent(prev => prev + emoji.native)}
-          locale="fr"
-        />
-      </div>
-    )}
-  </form>
-</div>
-
+          <form
+            onSubmit={handleSendMessage}
+            className="flex items-center bg-white rounded-full px-4 shadow-sm border border-gray-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all duration-200"
+          >
+            <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2">
+              😀
+            </button>
+            <input
+              type="file"
+              id="private-image-upload"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+            <label htmlFor="private-image-upload" className="cursor-pointer p-2">
+              📷
+            </label>
+            <input
+              type="text"
+              value={newMessageContent}
+              onChange={e => setNewMessageContent(e.target.value)}
+              placeholder="Écrivez un message..."
+              className="flex-1 py-3 bg-transparent focus:outline-none text-gray-700 placeholder-gray-400 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={!newMessageContent.trim()}
+              className={`ml-2 p-2 rounded-full transition-all ${newMessageContent.trim() ? 'text-blue-500 hover:text-blue-600 hover:bg-blue-50' : 'text-gray-300 cursor-not-allowed'}`}
+            >
+              <Send className="w-5 h-5" />
+            </button>
+            {showEmojiPicker && (
+              <div className="absolute bottom-16 left-4 z-50">
+                <Picker
+                  data={data}
+                  onEmojiSelect={emoji => setNewMessageContent(prev => prev + emoji.native)}
+                  locale="fr"
+                />
+              </div>
+            )}
+          </form>
+        </div>
       </div>
     </div>
   );
-}
+};
 
 export default PrivateChat;
