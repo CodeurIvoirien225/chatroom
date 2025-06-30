@@ -12,6 +12,8 @@ import nodemailer from 'nodemailer';
 
 
 
+
+
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -637,12 +639,15 @@ app.get('/online-users', async (req, res) => {
       conn = await pool.getConnection();
 
       const query = `
-          SELECT p.user_id AS id, p.username, p.first_name, p.last_name, p.avatar_url
-          FROM online_status o
-          JOIN profiles p ON o.user_id = p.user_id
-          WHERE o.online = TRUE AND o.user_id != ?
-          ORDER BY o.last_active DESC
-          LIMIT 10
+        SELECT p.user_id AS id, p.username, p.first_name, p.last_name, p.avatar_url
+FROM online_status o
+JOIN profiles p ON o.user_id = p.user_id
+WHERE o.online = TRUE 
+  AND o.last_active >= NOW() - INTERVAL 2 MINUTE
+  AND o.user_id != ?
+ORDER BY o.last_active DESC
+LIMIT 10
+
       `;
 
       const [rows] = await conn.query(query, [excludeUserId]);
@@ -657,6 +662,32 @@ app.get('/online-users', async (req, res) => {
       if (conn) conn.release(); // Libère la connexion même en cas d'erreur
   }
 });
+
+
+app.post('/logout', async (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId manquant' });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.query(
+      `UPDATE online_status SET online = 0, last_active = NOW() WHERE user_id = ?`,
+      [userId]
+    );
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Erreur /logout :', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+
 
 // Assurez-vous aussi que le point de terminaison d'upload d'avatar (/profile/:id/avatar)
 // enregistre bien la chaîne complète (y compris le préfixe) dans la BDD.
@@ -1251,6 +1282,7 @@ app.post('/block-user', async (req, res) => {
 
 
 
+
 // NOUVELLE ROUTE : Débloquer un utilisateur
 app.post('/unblock-user', async (req, res) => {
   // IMPORTANT: Le blocker_id DOIT venir de l'utilisateur authentifié (via JWT)
@@ -1292,6 +1324,7 @@ app.post('/unblock-user', async (req, res) => {
 
 
 
+
 // Vérifier l'appartenance à une salle
 app.get("/rooms/:roomId/membership/:userId", async (req, res) => {
   const { roomId, userId } = req.params;
@@ -1311,6 +1344,7 @@ app.get("/rooms/:roomId/membership/:userId", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 
 
@@ -1378,6 +1412,24 @@ app.get('/users/:userId/rooms', authenticate, async (req, res) => {
   }
 });
 
+
+
+app.post('/ping', async (req, res) => {
+  const userId = req.body.userId;
+
+  if (!userId) return res.sendStatus(401);
+
+  try {
+    await pool.query(
+      'UPDATE online_status SET online = TRUE, last_active = NOW() WHERE user_id = ?',
+      [userId]
+    );
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Erreur ping:', err);
+    res.sendStatus(500);
+  }
+});
 
 
 
