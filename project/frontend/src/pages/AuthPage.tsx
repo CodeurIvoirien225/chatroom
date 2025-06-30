@@ -20,6 +20,8 @@ const AuthPage = () => {
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('');
   const navigate = useNavigate();
+  const [success, setSuccess] = useState('');
+
 
 
   const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
@@ -107,7 +109,9 @@ const AuthPage = () => {
         throw new Error(result.error || "Échec de l'inscription.");
       }
 
-      setError('Inscription réussie. Connectez-vous maintenant.');
+      setSuccess('Inscription réussie. Connectez-vous maintenant.');
+      setError(''); // Pour effacer d’éventuelles erreurs précédentes
+
       setActiveTab('login');
     } catch (error) {
       setError(error instanceof Error ? error.message : "Échec de l'inscription.");
@@ -153,6 +157,12 @@ const AuthPage = () => {
             S'inscrire
           </button>
         </div>
+
+        {success && (
+  <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 text-sm">
+    {success}
+  </div>
+)}
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm">

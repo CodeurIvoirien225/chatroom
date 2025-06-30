@@ -9,12 +9,24 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (user?.id) {
+      try {
+        await fetch('https://chatroom-backend-e1n0.onrender.com/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id }),
+        });
+      } catch (error) {
+        console.error('Erreur lors de la déconnexion serveur:', error);
+      }
+    }
+  
     setUser(null);
     toast.success('Déconnexion réussie');
     navigate('/');
   };
-
+  
   const avatarUrl = user?.avatar_url || null;
 
   return (

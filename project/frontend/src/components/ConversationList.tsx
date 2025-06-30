@@ -58,6 +58,8 @@ const ConversationList: React.FC = () => {
       console.error('[fetchOnlineStatus] Exception attrapée :', error);
       setOnlineUsers([]);
     }
+    console.log("👤 ID utilisateur actuel :", user?.id);
+
   }, [user?.id]);
 
 
@@ -134,20 +136,35 @@ const ConversationList: React.FC = () => {
 
 
   useEffect(() => {
+    if (!user?.id) return;
+  
+    // ➤ Ping toutes les 30 secondes
+    const pingInterval = setInterval(() => {
+      fetch(`${API_BASE_URL}/ping`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+    }, 30000);
+  
+    // ➤ Appels initiaux
     fetchOnlineStatus();
     fetchConversations();
-
-    // Rafraîchir les données toutes les 15 secondes pour les mises à jour en temps quasi réel
-    const intervalId = setInterval(() => {
+  
+    // ➤ Rafraîchissement toutes les 15 secondes
+    const refreshInterval = setInterval(() => {
       fetchOnlineStatus();
       fetchConversations();
-    }, 15000); // 15 secondes
-
+    }, 15000);
+  
+    // ➤ Nettoyage
     return () => {
-      clearInterval(intervalId);
-      searchUsers.cancel(); // Annuler toute recherche en cours si le composant est démonté
+      clearInterval(pingInterval);
+      clearInterval(refreshInterval);
+      searchUsers.cancel();
     };
-  }, [fetchOnlineStatus, fetchConversations, searchUsers]);
+  }, [fetchOnlineStatus, fetchConversations, searchUsers, user?.id]);
+  
 
   // ... (formatTime existante)
   const formatTime = (timestamp: string) => {
@@ -177,6 +194,7 @@ const ConversationList: React.FC = () => {
   //   return name.toLowerCase().includes(searchTerm.toLowerCase());
   // });
 
+  console.log("🟢 Utilisateurs en ligne dans le composant :", onlineUsers);
 
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full">

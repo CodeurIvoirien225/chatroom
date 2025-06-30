@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+
 import { Save, Camera, LogOut } from 'lucide-react';
 import NavBar from '../components/NavBar';
 import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar'; // Import du Sidebar
+
 
 
 const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
@@ -26,6 +29,8 @@ const ProfilePage = () => {
   const { user, setUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
+  
   const [profile, setProfile] = useState<ProfileData>({
     id: user?.id || 0,
     username: '',
@@ -133,10 +138,24 @@ const ProfilePage = () => {
     }));
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    toast.success('Déconnexion réussie');
-  };
+const handleLogout = async () => {
+  if (user?.id) {
+    try {
+      await fetch('http://localhost:3001/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion serveur:', error);
+    }
+  }
+
+  setUser(null);
+  toast.success('Déconnexion réussie');
+  navigate('/');
+};
+
 
   if (loading) {
     return (
