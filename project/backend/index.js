@@ -30,6 +30,7 @@ const JWT_RESET_SECRET = process.env.JWT_SECRET || 'reset_secret';
 
 // Configuration de base
 const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenv.config();
@@ -223,6 +224,7 @@ app.post('/reset-password/:token', async (req, res) => {
 // const path = require('path');
 
 // AUTHENTIFICATION
+
 
 // Connexion utilisateur
 app.post("/login", async (req, res) => {
@@ -686,6 +688,7 @@ app.post('/logout', async (req, res) => {
     if (conn) conn.release();
   }
 });
+
 
 
 
