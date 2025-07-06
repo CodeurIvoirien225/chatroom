@@ -168,6 +168,17 @@ const pool = mysql.createPool({
 });
 
 
+// Ping la base de données toutes les 5 minutes pour garder la connexion active
+setInterval(async () => {
+  try {
+    await pool.query('SELECT 1');
+    console.log('Ping MySQL réussi');
+  } catch (err) {
+    console.error('Erreur lors du ping MySQL :', err);
+  }
+}, 5 * 60 * 1000); // 5 minutes
+
+
 // Votre route existante pour l'envoi de l'e-mail de réinitialisation (POST)
 app.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
