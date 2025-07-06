@@ -33,8 +33,7 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
   const [onlineUsers, setOnlineUsers] = useState<OtherUserProfile[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-
-  const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
+  const API_BASE_URL = 'http://localhost:3001';
 
   const fetchOtherUserProfile = useCallback(async () => {
     try {
@@ -110,26 +109,48 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+  
+    // Vérifier la taille du fichier côté frontend
+    const maxSize = 50 * 1024 * 1024; // 50 Mo
+    if (file.size > maxSize) {
+      alert('Le fichier dépasse la limite de 50 Mo autorisée.');
+      return;
+    }
+  
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('media', file);
     formData.append('sender_id', String(currentUserId));
     formData.append('receiver_id', String(otherUserId));
-
+  
     try {
-      const res = await fetch(`${API_BASE_URL}/private-messages/upload-image`, {
+      const res = await fetch(`${API_BASE_URL}/private-messages/upload-media`, {
         method: 'POST',
         body: formData
       });
-      if (!res.ok) throw new Error('Upload image failed');
+  
+      if (!res.ok) {
+        const errorText = await res.text();
+        // Si backend retourne erreur multer
+        if (errorText.includes('File too large')) {
+          alert('Erreur : Le fichier est trop volumineux (max 50 Mo).');
+        } else {
+          alert('Erreur lors de l’envoi du fichier : ' + errorText);
+        }
+        throw new Error(errorText);
+      }
+  
       fetchMessages();
     } catch (err) {
-      console.error(err);
+      console.error('Erreur lors de l’envoi du fichier média :', err);
     }
   };
+  
+
 
   useEffect(() => {
     const fetchData = () => {
@@ -206,11 +227,17 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
             messages.map((message) => (
               <div key={message.id} className={`flex ${message.sender_id === currentUserId ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] p-3 rounded-2xl ${message.sender_id === currentUserId ? 'bg-blue-500 text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none shadow-xs border border-gray-100'} transition-all duration-200`}>
-                  {/\.(jpe?g|png|gif|webp)$/i.test(message.content) ? (
-                    <img src={message.content} alt="Image envoyée" className="max-w-xs rounded-md" />
-                  ) : (
-                    <p className="text-sm leading-relaxed">{message.content}</p>
-                  )}
+                {/\.(jpe?g|png|gif|webp)$/i.test(message.content) ? (
+  <img src={message.content} alt="Image envoyée" className="max-w-xs rounded-md" />
+) : /\.(mp4|webm|ogg)$/i.test(message.content) ? (
+  <video controls className="max-w-xs rounded-md">
+    <source src={message.content} />
+    Votre navigateur ne supporte pas la vidéo.
+  </video>
+) : (
+  <p className="text-sm leading-relaxed">{message.content}</p>
+)}
+
                   <div className={`flex items-center justify-end mt-1 space-x-1 ${message.sender_id === currentUserId ? 'text-blue-100' : 'text-gray-400'}`}>
                     <span className="text-xs">
                       {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -233,12 +260,13 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
               😀
             </button>
             <input
-              type="file"
-              id="private-image-upload"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-            />
+  type="file"
+  id="private-image-upload"
+  accept="image/*,video/*"
+  onChange={handleMediaUpload}
+  className="hidden"
+/>
+
             <label htmlFor="private-image-upload" className="cursor-pointer p-2">
               📷
             </label>
