@@ -653,39 +653,50 @@ app.post("/blocks", async (req, res) => {
   }
 });
 
-
 app.get('/online-users', async (req, res) => {
   const excludeUserId = req.query.exclude;
+  
   if (!excludeUserId) {
-      return res.status(400).json({ error: 'Paramètre exclude requis' });
+    return res.status(400).json({ error: 'Paramètre exclude requis' });
   }
 
-  let conn; // Déclarez conn ici pour qu'il soit accessible dans le bloc finally
+  let conn;
   try {
-      conn = await pool.getConnection();
+    conn = await pool.getConnection();
 
-      const query = `
-        SELECT p.user_id AS id, p.username, p.first_name, p.last_name, p.avatar_url
-FROM online_status o
-JOIN profiles p ON o.user_id = p.user_id
-WHERE o.online = TRUE 
-  AND o.last_active >= NOW() - INTERVAL 2 MINUTE
-  AND o.user_id != ?
-ORDER BY o.last_active DESC
-LIMIT 10
+    const query = `
+      SELECT p.user_id AS id, p.username, p.first_name, p.last_name, p.avatar_url
+      FROM online_status o
+      JOIN profiles p ON o.user_id = p.user_id
+      WHERE o.online = TRUE 
+        AND o.last_active >= NOW() - INTERVAL 2 MINUTE
+        AND o.user_id != ?
+      ORDER BY o.last_active DESC
+      LIMIT 10
+    `;
 
-      `;
-
-      const [rows] = await conn.query(query, [excludeUserId]);
-
-      // On renvoie simplement les lignes telles quelles.
-      res.json(rows); // <-- Changez 'rowsWithFullAvatarUrl' en 'rows'
-
+    const [rows] = await conn.query(query, [excludeUserId]);
+    res.json(rows);
   } catch (error) {
-      console.error('Erreur /online-users:', error);
-      res.status(500).json({ error: 'Erreur serveur' });
+    // 🎯 Log complet pour déboguer plus facilement
+    console.error('❌ Erreur dans /online-users');
+    console.error('Code:', error.code);
+    console.error('Message:', error.message);
+    console.error('Stack:', error.stack);
+
+    if (error.code === 'ECONNRESET') {
+      res.status(503).json({ error: 'Connexion avec la base de données réinitialisée' });
+    } else {
+      res.status(500).json({ error: 'Erreur interne du serveur' });
+    }
   } finally {
-      if (conn) conn.release(); // Libère la connexion même en cas d'erreur
+    if (conn) {
+      try {
+        conn.release();
+      } catch (releaseError) {
+        console.error('Erreur lors de la libération de la connexion:', releaseError);
+      }
+    }
   }
 });
 
