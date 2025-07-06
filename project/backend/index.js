@@ -29,7 +29,7 @@ const transporter = nodemailer.createTransport({
 const JWT_RESET_SECRET = process.env.JWT_SECRET || 'reset_secret';
 
 // Configuration de base
-const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
+const API_BASE_URL = 'https://chatroom-6uv8.onrender.com';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -80,7 +80,31 @@ const storage = multer.diskStorage({
     cb(null, uniqueName);
   }
 });
-const upload = multer({ storage });
+
+
+const allowedMimeTypes = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'video/mp4',
+  'video/webm',
+  'video/ogg'
+];
+
+
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 🔒 limite à 50 Mo
+  fileFilter: (req, file, cb) => {
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Type de fichier non autorisé'), false);
+    }
+  }
+});
 
 app.use('/uploads', express.static(uploadDir));
 
@@ -1038,7 +1062,8 @@ app.post(
       }
 
       // Construction de l’URL publique de l’image
-      const imageUrl = `https://chatroom-backend-e1n0.onrender.com/uploads/${file.filename}`;
+      const fileUrl = `https://chatroom-6uv8.onrender.com/uploads/${file.filename}`; // ✅ Chemin correct
+
 
       // Connexion à la base
       const conn = await pool.getConnection();
@@ -1080,6 +1105,167 @@ app.post(
   }
 );
 
+
+app.post('/rooms/:roomId/upload-media', upload.single('media'), async (req, res) => {
+  try {
+    const { sender_id, sender_username, room_id } = req.body;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: 'Aucun fichier reçu.' });
+    }
+
+    if (!sender_id || !room_id) {
+      fs.unlinkSync(file.path);
+      return res.status(400).json({ error: 'IDs manquants.' });
+    }
+
+    // CORRECTION: Utilisez room_participants au lieu de room_members
+    const conn = await pool.getConnection();
+    const [membership] = await conn.query(
+      'SELECT 1 FROM room_participants WHERE room_id = ? AND user_id = ?',
+      [room_id, sender_id]
+    );
+    
+    if (membership.length === 0) {
+      conn.release();
+      fs.unlinkSync(file.path);
+      return res.status(403).json({ error: 'Vous devez être membre de la salle.' });
+    }
+
+    const mediaUrl = `${API_BASE_URL}/uploads/${file.filename}`;
+
+    const [result] = await conn.query(
+      `INSERT INTO messages (room_id, sender_id, sender_username, content, created_at) 
+       VALUES (?, ?, ?, ?, NOW())`,
+      [room_id, sender_id, sender_username, mediaUrl]
+    );
+    
+    conn.release();
+
+    res.status(201).json({
+      id: result.insertId,
+      room_id,
+      sender_id,
+      sender_username,
+      content: mediaUrl,
+      created_at: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Erreur envoi media chat public :', error);
+    
+    if (req.file) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'Le fichier dépasse la limite de 50 Mo' });
+    }
+    if (error.message.includes('Type de fichier')) {
+      return res.status(415).json({ error: 'Type de fichier non supporté' });
+    }
+    
+    res.status(500).json({ 
+      error: error.message || 'Erreur serveur' 
+    });
+  }
+});
+
+
+app.post(
+  '/messages/upload-media',
+  upload.single('media'),
+  async (req, res) => {
+    try {
+      const { room_id, sender_id, sender_username } = req.body;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ error: 'Aucun fichier reçu.' });
+      }
+
+      if (!room_id || !sender_id || !sender_username) {
+        return res.status(400).json({ error: 'Données manquantes.' });
+      }
+
+      const fileUrl = `https://chatroom-6uv8.onrender.com/uploads/${file.filename}`;
+
+      const conn = await pool.getConnection();
+
+      const [result] = await conn.query(
+        `INSERT INTO messages (room_id, sender_id, sender_username, content, created_at)
+         VALUES (?, ?, ?, ?, NOW())`,
+        [room_id, sender_id, sender_username, fileUrl]
+      );
+
+      conn.release();
+
+      return res.status(201).json({
+        id: result.insertId,
+        room_id,
+        sender_id,
+        sender_username,
+        content: fileUrl,
+        created_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Erreur upload média salle :', err);
+      return res.status(500).json({ error: 'Erreur serveur.' });
+    }
+  }
+);
+
+
+
+
+app.post('/private-messages/upload-media', upload.single('media'), async (req, res) => {
+  try {
+    const sender_id = parseInt(req.body.sender_id, 10);
+    const receiver_id = parseInt(req.body.receiver_id, 10);
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: 'Aucun fichier reçu.' });
+    }
+
+    if (isNaN(sender_id) || isNaN(receiver_id)) {
+      return res.status(400).json({ error: 'IDs invalides.' });
+    }
+
+    const fileUrl = `https://chatroom-6uv8.onrender.com/uploads/${file.filename}`; // Chemin correct
+
+
+    const conn = await pool.getConnection();
+
+    const [blocked] = await conn.query(
+      `SELECT 1 FROM blocked_users WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)`,
+      [sender_id, receiver_id, receiver_id, sender_id]
+    );
+    if (blocked.length) {
+      conn.release();
+      return res.status(403).json({ error: 'Dialogue impossible (blocage).' });
+    }
+
+    const [result] = await conn.query(
+      `INSERT INTO private_messages (sender_id, receiver_id, content, created_at) VALUES (?, ?, ?, NOW())`,
+      [sender_id, receiver_id, fileUrl]
+    );
+    conn.release();
+
+    return res.status(201).json({
+      id: result.insertId,
+      sender_id,
+      receiver_id,
+      content: fileUrl,
+      created_at: new Date().toISOString()
+    });
+
+  } catch (err) {
+    console.error('Erreur upload-media privé :', err);
+    return res.status(500).json({ error: err.message || 'Erreur serveur.' });
+  }
+});
 
 
 
