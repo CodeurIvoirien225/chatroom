@@ -29,7 +29,7 @@ const transporter = nodemailer.createTransport({
 const JWT_RESET_SECRET = process.env.JWT_SECRET || 'reset_secret';
 
 // Configuration de base
-const API_BASE_URL = 'https://chatroom-6uv8.onrender.com';
+const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -186,7 +186,7 @@ app.post('/forgot-password', async (req, res) => {
 
     // Générer un token JWT valable 15 minutes
     const token = jwt.sign({ userId }, JWT_RESET_SECRET, { expiresIn: '15m' });
-    const resetLink = `https://chatroom-6uv8.onrender.com/reset-password/${token}`; // Ce lien est correct
+    const resetLink = `https://chatroom-backend-e1n0.onrender.com/reset-password/${token}`; // Ce lien est correct
 
     await transporter.sendMail({
       from: process.env.RESET_EMAIL_FROM,
@@ -1062,7 +1062,7 @@ app.post(
       }
 
       // Construction de l’URL publique de l’image
-      const fileUrl = `https://chatroom-6uv8.onrender.com/uploads/${file.filename}`; // ✅ Chemin correct
+      const fileUrl = `https://chatroom-backend-e1n0.onrender.com/uploads/${file.filename}`; // ✅ Chemin correct
 
 
       // Connexion à la base
@@ -1189,7 +1189,7 @@ app.post(
         return res.status(400).json({ error: 'Données manquantes.' });
       }
 
-      const fileUrl = `https://chatroom-6uv8.onrender.com/uploads/${file.filename}`;
+      const fileUrl = `https://chatroom-backend-e1n0.onrender.com/uploads/${file.filename}`;
 
       const conn = await pool.getConnection();
 
@@ -1233,7 +1233,7 @@ app.post('/private-messages/upload-media', upload.single('media'), async (req, r
       return res.status(400).json({ error: 'IDs invalides.' });
     }
 
-    const fileUrl = `https://chatroom-6uv8.onrender.com/uploads/${file.filename}`; // Chemin correct
+    const fileUrl = `https://chatroom-backend-e1n0.onrender.com/uploads/${file.filename}`; // Chemin correct
 
 
     const conn = await pool.getConnection();
