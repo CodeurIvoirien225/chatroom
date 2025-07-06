@@ -33,7 +33,7 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
   const [onlineUsers, setOnlineUsers] = useState<OtherUserProfile[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const API_BASE_URL = 'http://localhost:3001';
+  const API_BASE_URL = 'https://chatroom-6uv8.onrender.com';
 
   const fetchOtherUserProfile = useCallback(async () => {
     try {
