@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
-import { Send, MessageCircleMore, Check, Menu, ArrowLeft } from 'lucide-react';
 import { fr } from 'date-fns/locale';
+import { Send, MessageCircleMore, Check, Menu, ArrowLeft } from 'lucide-react';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import Sidebar from '../components/Sidebar';
@@ -28,6 +28,8 @@ interface Profile {
   id: string;
   username: string;
   avatar_url?: string;
+  is_online?: boolean;
+  last_seen?: string;
 }
 
 const ChatPage = () => {
@@ -42,10 +44,14 @@ const ChatPage = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isRoomMember, setIsRoomMember] = useState<boolean | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
-  const checkMembership = async (): Promise<boolean> => {
+  const [autoScroll, setAutoScroll] = useState(true);
+  
+  const checkMembership = useCallback(async (): Promise<boolean> => {
     if (!user?.id || !roomId) return false;
     try {
       const response = await fetch(`${API_BASE_URL}/rooms/${roomId}/membership/${user.id}`);
@@ -56,7 +62,20 @@ const ChatPage = () => {
       console.error("Error checking room membership:", error);
       return false;
     }
-  };
+  }, [user?.id, roomId]);
+
+  const fetchParticipants = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/rooms/${roomId}/online-participants?currentUserId=${user?.id || ''}`
+      );
+      if (!response.ok) throw new Error('Failed to fetch participants');
+      const data = await response.json();
+      setParticipants(data);
+    } catch (error) {
+      console.error('Error fetching participants:', error);
+    }
+  }, [roomId, user?.id]);
 
   const joinRoom = async () => {
     if (!user?.id || !roomId) return;
@@ -84,7 +103,7 @@ const ChatPage = () => {
     }
   };
 
-  const fetchInitialData = async () => {
+  const fetchInitialData = useCallback(async () => {
     if (!roomId) {
       setLoading(false);
       return;
@@ -98,43 +117,60 @@ const ChatPage = () => {
       setRoom(roomDetails);
 
       if (isMember) {
-        const [messagesData, participantsData] = await Promise.all([
+        const [messagesData] = await Promise.all([
           fetch(`${API_BASE_URL}/rooms/${roomId}/messages`).then(res => res.json()),
-          fetch(`${API_BASE_URL}/rooms/${roomId}/online-participants`).then(res => res.json()),
         ]);
         setMessages(messagesData || []);
-        setParticipants(participantsData || []);
+        await fetchParticipants();
       }
     } catch (error) {
       console.error('Error fetching initial data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [roomId, checkMembership, fetchParticipants]);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const isNearBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
+      setAutoScroll(isNearBottom);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (autoScroll && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, autoScroll]);
 
   useEffect(() => {
     fetchInitialData();
 
-    const messagesPollingInterval = setInterval(() => {
+    const interval = setInterval(() => {
       if (isRoomMember) {
         fetch(`${API_BASE_URL}/rooms/${roomId}/messages`)
           .then(res => res.json())
           .then(data => setMessages(data || []))
           .catch(console.error);
+
+        fetchParticipants();
       }
-    }, 3000);
+    }, 5000);
 
-    return () => clearInterval(messagesPollingInterval);
-  }, [roomId, user, isRoomMember]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    return () => clearInterval(interval);
+  }, [roomId, isRoomMember, fetchInitialData, fetchParticipants]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !user || !roomId || !isRoomMember) return;
 
+    setIsSending(true);
     try {
       const response = await fetch(`${API_BASE_URL}/rooms/${roomId}/messages`, {
         method: 'POST',
@@ -150,9 +186,12 @@ const ChatPage = () => {
       if (!response.ok) throw new Error(await response.text());
       
       setNewMessage('');
+      setAutoScroll(true);
     } catch (error) {
       console.error("Error sending message:", error);
       alert("Error sending message. Please try again.");
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -183,6 +222,7 @@ const ChatPage = () => {
         const errorText = await response.text();
         throw new Error(errorText);
       }
+      setAutoScroll(true);
     } catch (error) {
       console.error("Media upload error:", error);
       alert(error.message || "Erreur lors de l'envoi du fichier");
@@ -199,6 +239,33 @@ const ChatPage = () => {
     return name.charAt(0).toUpperCase();
   };
 
+  const formatMessageDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+      if (diffInSeconds < 60) return "Maintenant";
+      if (diffInSeconds < 3600) return `Il y a ${Math.floor(diffInSeconds / 60)} min`;
+      if (diffInSeconds < 86400) return `Il y a ${Math.floor(diffInSeconds / 3600)} h`;
+      if (diffInSeconds < 604800) return `Il y a ${Math.floor(diffInSeconds / 86400)} j`;
+      
+      return date.toLocaleDateString('fr-FR', { 
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+    } catch (e) {
+      console.error("Erreur de formatage:", e);
+      return "À l'instant";
+    }
+  };
+
+  const formatLastSeen = (lastSeen?: string) => {
+    if (!lastSeen) return "Inconnu";
+    return `Dernière activité: ${formatDistanceToNow(new Date(lastSeen), { addSuffix: true, locale: fr })}`;
+  };
+
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       <Sidebar />
@@ -207,7 +274,7 @@ const ChatPage = () => {
           ${showSidebar ? 'left-0' : '-left-64'} lg:left-0`}>
         <div className="p-4 border-b flex items-center justify-between">
           <h3 className="font-semibold text-gray-800">
-            Participants ({participants.length})
+            Participants ({participants.filter(p => p.is_online).length} en ligne)
           </h3>
           <Link to="/rooms" className="lg:hidden">
             <ArrowLeft className="h-5 w-5 text-gray-600" />
@@ -222,28 +289,46 @@ const ChatPage = () => {
             </div>
           ) : participants.length === 0 ? (
             <div className="p-4 text-gray-500 text-sm">
-              Aucun participant actuellement
+              {user ? "Vous êtes le seul participant" : "Aucun participant"}
             </div>
           ) : (
             participants.map(participant => (
-              <Link
+              <div
                 key={participant.id}
-                to={`/profile/${participant.id}`}
-                className="block p-3 flex items-center hover:bg-gray-50 transition-colors"
+                className="flex items-center p-3 hover:bg-gray-50 transition-colors"
               >
-                {participant.avatar_url ? (
-                  <img
-                    src={participant.avatar_url}
-                    alt={`${participant.username} avatar`}
-                    className="w-8 h-8 rounded-full object-cover mr-3"
+                <div className="relative mr-3">
+                  {participant.avatar_url ? (
+                    <img
+                      src={participant.avatar_url}
+                      alt={`${participant.username}`}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold">
+                      {getAvatarFallback(participant.username)}
+                    </div>
+                  )}
+                  <span 
+                    className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                      participant.is_online ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                    }`}
+                    title={participant.is_online ? "En ligne" : formatLastSeen(participant.last_seen)}
                   />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold mr-3">
-                    {getAvatarFallback(participant.username)}
-                  </div>
-                )}
-                <span className="text-gray-700">{participant.username}</span>
-              </Link>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {participant.username}
+                    {participant.id === user?.id && " (Vous)"}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {participant.is_online ? 
+                      "En ligne maintenant" : 
+                      formatLastSeen(participant.last_seen)
+                    }
+                  </p>
+                </div>
+              </div>
             ))
           )}
         </div>
@@ -262,12 +347,15 @@ const ChatPage = () => {
               {room?.name || 'Loading...'}
             </h3>
             <p className="text-xs text-gray-500 font-light">
-              {isRoomMember ? `${participants.length} en ligne` : 'Non membre'}
+              {isRoomMember ? `${participants.filter(p => p.is_online).length} en ligne` : 'Non membre'}
             </p>
           </div>
         </div>
 
-        <div className="flex-1 p-4 pb-4 overflow-y-auto space-y-2">
+        <div 
+          className="flex-1 p-4 pb-4 overflow-y-auto space-y-2"
+          ref={messagesContainerRef}
+        >
           {loading ? (
             <div className="flex justify-center items-center h-full">
               <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div>
@@ -355,11 +443,18 @@ const ChatPage = () => {
                     <div className={`flex items-center justify-end mt-1 space-x-1 ${
                       isCurrentUser ? 'text-blue-100' : 'text-gray-400'
                     }`}>
-                      <span className="text-xs">
-                        {formatDistanceToNow(new Date(message.created_at), {
-                          addSuffix: true,
-                          locale: fr,
+                      <span 
+                        className="text-xs text-gray-500 whitespace-nowrap"
+                        title={new Date(message.created_at).toLocaleString('fr-FR', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
                         })}
+                      >
+                        {formatMessageDate(message.created_at)}
                       </span>
                       {isCurrentUser && <Check className="w-3 h-3" />}
                     </div>
@@ -371,11 +466,11 @@ const ChatPage = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-4 bg-white/90 backdrop-blur-sm border-t border-gray-100">
+        <div className="p-4 bg-white/90 backdrop-blur-sm border-t border-gray-100 sticky bottom-0">
           {isRoomMember === true ? (
             <form
               onSubmit={handleSendMessage}
-              className="flex items-center bg-white rounded-full px-4 shadow-sm border border-gray-200 focus-within:border-blue-400"
+              className="flex items-center bg-white rounded-full px-4 shadow-sm border border-gray-200 focus-within:border-blue-400 relative"
             >
               <button
                 type="button"
@@ -385,17 +480,22 @@ const ChatPage = () => {
                 😀
               </button>
 
-              
-<label htmlFor="media-upload" className="cursor-pointer p-2 text-gray-500 hover:text-gray-700">
-  {isUploading ? '📤 Envoi...' : '📷 Media'}
-</label>
-<input
-  type="file"
-  id="media-upload"
-  accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.ogg,.mov"
-  onChange={handleMediaUpload}
-  className="hidden"
-/>
+              <label htmlFor="media-upload" className="cursor-pointer p-2 text-gray-500 hover:text-gray-700">
+                {isUploading ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                    <span className="text-xs">Envoi...</span>
+                  </div>
+                ) : '📷'}
+              </label>
+              <input
+                type="file"
+                id="media-upload"
+                accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.ogg,.mov"
+                onChange={handleMediaUpload}
+                className="hidden"
+                disabled={isUploading}
+              />
 
               <input
                 type="text"
@@ -407,12 +507,16 @@ const ChatPage = () => {
 
               <button
                 type="submit"
-                disabled={!newMessage.trim() || loading}
+                disabled={!newMessage.trim() || isSending}
                 className={`ml-2 p-2 rounded-full ${
                   newMessage.trim() ? 'text-blue-500 hover:text-blue-600' : 'text-gray-300'
                 }`}
               >
-                <Send className="w-5 h-5" />
+                {isSending ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
               </button>
             </form>
           ) : isRoomMember === false ? (

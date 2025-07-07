@@ -31,8 +31,9 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
   const [newMessageContent, setNewMessageContent] = useState('');
   const [otherUserProfile, setOtherUserProfile] = useState<OtherUserProfile | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<OtherUserProfile[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const API_BASE_URL = 'https://chatroom-backend-e1n0.onrender.com';
 
   const fetchOtherUserProfile = useCallback(async () => {
@@ -109,48 +110,46 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
     }
   };
 
-
-
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-  
+
     // Vérifier la taille du fichier côté frontend
     const maxSize = 50 * 1024 * 1024; // 50 Mo
     if (file.size > maxSize) {
       alert('Le fichier dépasse la limite de 50 Mo autorisée.');
       return;
     }
-  
+
+    setIsUploading(true);
     const formData = new FormData();
     formData.append('media', file);
     formData.append('sender_id', String(currentUserId));
     formData.append('receiver_id', String(otherUserId));
-  
+
     try {
       const res = await fetch(`${API_BASE_URL}/private-messages/upload-media`, {
         method: 'POST',
         body: formData
       });
-  
+
       if (!res.ok) {
         const errorText = await res.text();
-        // Si backend retourne erreur multer
         if (errorText.includes('File too large')) {
           alert('Erreur : Le fichier est trop volumineux (max 50 Mo).');
         } else {
-          alert('Erreur lors de l’envoi du fichier : ' + errorText);
+          alert("Erreur lors de l'envoi du fichier : " + errorText);
         }
         throw new Error(errorText);
       }
-  
+
       fetchMessages();
     } catch (err) {
-      console.error('Erreur lors de l’envoi du fichier média :', err);
+      console.error("Erreur lors de l'envoi du fichier média :", err);
+    } finally {
+      setIsUploading(false);
     }
   };
-  
-
 
   useEffect(() => {
     const fetchData = () => {
@@ -172,7 +171,6 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
     const name = profile?.first_name || profile?.username || 'U';
     return name.charAt(0)?.toUpperCase() || 'U';
   };
-  
 
   const isOtherUserOnline = onlineUsers.some(u => u.id === otherUserId);
 
@@ -227,17 +225,16 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
             messages.map((message) => (
               <div key={message.id} className={`flex ${message.sender_id === currentUserId ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] p-3 rounded-2xl ${message.sender_id === currentUserId ? 'bg-blue-500 text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none shadow-xs border border-gray-100'} transition-all duration-200`}>
-                {/\.(jpe?g|png|gif|webp)$/i.test(message.content) ? (
-  <img src={message.content} alt="Image envoyée" className="max-w-xs rounded-md" />
-) : /\.(mp4|webm|ogg)$/i.test(message.content) ? (
-  <video controls className="max-w-xs rounded-md">
-    <source src={message.content} />
-    Votre navigateur ne supporte pas la vidéo.
-  </video>
-) : (
-  <p className="text-sm leading-relaxed">{message.content}</p>
-)}
-
+                  {/\.(jpe?g|png|gif|webp)$/i.test(message.content) ? (
+                    <img src={message.content} alt="Image envoyée" className="max-w-xs rounded-md" />
+                  ) : /\.(mp4|webm|ogg)$/i.test(message.content) ? (
+                    <video controls className="max-w-xs rounded-md">
+                      <source src={message.content} />
+                      Votre navigateur ne supporte pas la vidéo.
+                    </video>
+                  ) : (
+                    <p className="text-sm leading-relaxed">{message.content}</p>
+                  )}
                   <div className={`flex items-center justify-end mt-1 space-x-1 ${message.sender_id === currentUserId ? 'text-blue-100' : 'text-gray-400'}`}>
                     <span className="text-xs">
                       {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -254,22 +251,31 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
         <div className="sticky bottom-0 bg-white/90 backdrop-blur-sm p-4 border-t border-gray-100">
           <form
             onSubmit={handleSendMessage}
-            className="flex items-center bg-white rounded-full px-4 shadow-sm border border-gray-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all duration-200"
+            className="flex items-center bg-white rounded-full px-4 shadow-sm border border-gray-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all duration-200 relative"
           >
             <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2">
               😀
             </button>
-            <input
-  type="file"
-  id="private-image-upload"
-  accept="image/*,video/*"
-  onChange={handleMediaUpload}
-  className="hidden"
-/>
-
-            <label htmlFor="private-image-upload" className="cursor-pointer p-2">
-              📷
+            
+            <label htmlFor="private-image-upload" className="cursor-pointer p-2 relative">
+              {isUploading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                  <span className="text-xs text-gray-500">Envoi...</span>
+                </div>
+              ) : (
+                '📷'
+              )}
             </label>
+            <input
+              type="file"
+              id="private-image-upload"
+              accept="image/*,video/*"
+              onChange={handleMediaUpload}
+              className="hidden"
+              disabled={isUploading}
+            />
+
             <input
               type="text"
               value={newMessageContent}
@@ -284,6 +290,7 @@ const PrivateChat: React.FC<PrivateChatProps> = ({ currentUserId, otherUserId })
             >
               <Send className="w-5 h-5" />
             </button>
+            
             {showEmojiPicker && (
               <div className="absolute bottom-16 left-4 z-50">
                 <Picker
