@@ -168,17 +168,6 @@ const pool = mysql.createPool({
 });
 
 
-// Ping la base de données toutes les 5 minutes pour garder la connexion active
-setInterval(async () => {
-  try {
-    await pool.query('SELECT 1');
-    console.log('Ping MySQL réussi');
-  } catch (err) {
-    console.error('Erreur lors du ping MySQL :', err);
-  }
-}, 5 * 60 * 1000); // 5 minutes
-
-
 // Votre route existante pour l'envoi de l'e-mail de réinitialisation (POST)
 app.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
@@ -197,7 +186,7 @@ app.post('/forgot-password', async (req, res) => {
 
     // Générer un token JWT valable 15 minutes
     const token = jwt.sign({ userId }, JWT_RESET_SECRET, { expiresIn: '15m' });
-    const resetLink = `https://chatroom-backend-e1n0.onrender.com/reset-password/${token}`; // Ce lien est correct
+    const resetLink = `https://chatroom-6uv8.onrender.com/reset-password/${token}`; // Ce lien est correct
 
     await transporter.sendMail({
       from: process.env.RESET_EMAIL_FROM,
@@ -553,6 +542,7 @@ app.get("/rooms/:roomId/online-participants", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
+
 
 
 
